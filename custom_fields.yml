@@ -1,0 +1,27 @@
+- keyname: author_bio
+  name: About This Plugin
+  field_type: author_bio
+  category: environment,nature
+  description: Displays the hazard flag at the beach nearest you, official or estimated, from swim.report
+  github_url: https://github.com/leoherzog/trmnl-swim-report
+  learn_more_url: https://swim.report/
+- keyname: location
+  field_type: lat_lon
+  name: Location
+  description: Search for a city, address or postal code, or enter latitude,longitude. The nearest beach is shown.
+- keyname: units
+  field_type: select
+  name: Units
+  description: Wave height and distance
+  options:
+  - Imperial (ft, mi): imperial
+  - Metric (m, km): metric
+  default: imperial
+- keyname: timemode
+  field_type: select
+  name: Time Format
+  description: How the update time is shown
+  options:
+  - 12-hour: 12_hour
+  - 24-hour: 24_hour
+  default: 12_hour

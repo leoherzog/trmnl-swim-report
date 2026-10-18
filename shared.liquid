@@ -1,0 +1,306 @@
+{% template main %}
+{% comment %}
+One beach's flag, at every size.
+Parameters:
+- beach: the transform's display-ready beach (serverless.js), or nil
+- error: the transform's message when there is no beach
+- size: 'full', 'half_horizontal', 'half_vertical' or 'quadrant'
+- trmnl: the global trmnl object, which a render scope does not inherit
+{% endcomment %}
+
+<script type="text/javascript">
+  // Calls cb once test() holds: the framework runtime and MapLibre arrive
+  // after the markup's own scripts run.
+  window.swimWhen = window.swimWhen || function (test, cb) {
+    var tries = 0;
+    (function attempt() {
+      if (test()) return cb();
+      if (++tries <= 200) setTimeout(attempt, 50);
+    })();
+  };
+
+  // The paint of a flag color at el. The hue tokens, not the semantic roles
+  // (warning is orange); unknown is gray, never green. A limited palette snaps
+  // a hue it lacks to its closest ink (green prints yellow on B/W/R/Y), so
+  // that hue takes the gray 1-bit prints for it instead.
+  window.swimFlagPaint = window.swimFlagPaint || function (color, el) {
+    var token = { "green": "green", "yellow": "yellow", "red": "red", "double-red": "red" }[color] || "gray-50";
+    var inks = { "screen--color-3bwr": ["red"], "screen--color-3bwy": ["yellow"], "screen--color-4bwry": ["red", "yellow"] };
+    var grays = { green: "gray-60", yellow: "gray-60", red: "gray-40" };
+    var screen = TRMNLPaint.screen(el);
+    var palette = screen && Object.keys(inks).find(function (p) { return screen.classList.contains(p); });
+    if (palette && grays[token] && inks[palette].indexOf(token) === -1) token = grays[token];
+    return TRMNLPaint.bg(token, { el: el });
+  };
+</script>
+
+{% if beach == nil %}
+  <div class="layout layout--col">
+    <span class="title title--small lg:title--base text--center">Swim Report</span>
+    <span class="description lg:description--large text--center">{{ error | default: 'No data yet.' }}</span>
+  </div>
+{% else %}
+  {% if beach.source == 'official' %}
+    {% assign reminder = 'Always obey posted flags and lifeguards.' %}
+  {% else %}
+    {% assign reminder = 'Not an official flag. Always obey posted flags and lifeguards.' %}
+  {% endif %}
+
+  {% case size %}
+  {% when 'full' %}
+    {% if beach.lat and beach.lon %}{% assign has_map = true %}{% endif %}
+    <div class="layout layout--row portrait:layout--col gap--medium lg:gap--large">
+      {% if has_map %}
+        <div id="swim-map" class="map stretch rounded--base"></div>
+        {% assign details_width = 'w--[42cqw] portrait:w--full' %}
+      {% else %}
+        {% assign details_width = 'w--full' %}
+      {% endif %}
+      <div class="flex flex--col flex--left gap--medium {{ details_width }}">
+        {% render 'details', beach: beach, reminder: reminder, size: size %}
+      </div>
+    </div>
+
+    {% if has_map %}
+      <script src="https://trmnl.com/js/maplibre-gl/5.24.0/maplibre-gl.js"></script>
+      <link href="https://trmnl.com/js/maplibre-gl/5.24.0/maplibre-gl.css" rel="stylesheet">
+      <script type="text/javascript">
+        (function () {
+          // The beach and its neighbors as flags: [lon, lat, color], the
+          // beach first so it wins the declutter pass and draws on top.
+          var flags = [[{{ beach.lon }}, {{ beach.lat }}, "{{ beach.color }}"]].concat({% if beach.nearby %}{{ beach.nearby | json }}{% else %}[]{% endif %});
+          var glyphs = {
+            single: "{% render 'glyph', color: 'red' %}",
+            double: "{% render 'glyph', color: 'double-red' %}"
+          };
+          var mapEl = document.getElementById("swim-map");
+
+          // The same painted, outlined glyph as the flag beside the name. The
+          // runtime arms only the adaptive images in the markup, so these are
+          // armed by hand: the documented --framework-icon-src form. z--2
+          // lifts the marker over the runtime's map__dither canvas (added to
+          // the marker's own container once the map idles) and its labels (z 1).
+          function flagMarker(color, size) {
+            var host = document.createElement("span");
+            host.className = "flex z--2 image-stroke image-stroke--small image-stroke--black";
+            var img = document.createElement("img");
+            var glyph = color === "double-red" ? glyphs.double : glyphs.single;
+            img.className = "image--adaptive w--auto " + size;
+            img.src = glyph;
+            img.style.setProperty("--framework-icon-src", "url(\"" + glyph + "\")");
+            img.setAttribute("data-adaptive", "true");
+            TRMNLPaint.apply(img, swimFlagPaint(color, mapEl));
+            host.appendChild(img);
+            return host;
+          }
+
+          swimWhen(function () { return window.TRMNLMaps && window.TRMNLPaint && window.maplibregl; }, function () {
+            TRMNLMaps.watch(mapEl, function () {
+              var map = new maplibregl.Map(TRMNLMaps.options({
+                el: mapEl, preset: "streets", center: flags[0].slice(0, 2), zoom: 13
+              }));
+              // Skip a neighbor that would land on a flag already kept.
+              var gap = TRMNLPaint.px(24, { el: mapEl });
+              var kept = [];
+              flags.forEach(function (flag, i) {
+                var at = map.project([flag[0], flag[1]]);
+                var crowded = kept.some(function (k) { return Math.abs(k.at.x - at.x) < gap && Math.abs(k.at.y - at.y) < gap; });
+                if (!crowded) kept.push({ flag: flag, at: at, size: i === 0 ? "h--[36px] lg:h--[48px]" : "h--[20px] lg:h--[26px]" });
+              });
+              // Added in reverse, so the beach's own flag draws on top. The
+              // pole's foot stands on the beach.
+              kept.reverse().forEach(function (k) {
+                new maplibregl.Marker({ element: flagMarker(k.flag[2], k.size), anchor: "bottom-left" })
+                  .setLngLat([k.flag[0], k.flag[1]]).addTo(map);
+              });
+              return map;
+            });
+          });
+        })();
+      </script>
+    {% endif %}
+
+  {% when 'half_horizontal' %}
+    <div class="layout layout--row layout--left gap--large">
+      <div class="flex flex--col flex--left gap--small">
+        {% render 'flag', beach: beach, icon: 'h--[40px] lg:h--[52px]', text: 'label--xlarge lg:label--xxlarge' %}
+        <span class="label label--small label--outline lg:label--base">{{ beach.source_label }}</span>
+      </div>
+      <div class="flex flex--col flex--left gap--small grow">
+        <span class="title lg:title--large" data-clamp="1">{{ beach.name }}</span>
+        <span class="description lg:description--large" data-clamp="2">{{ beach.summary }}</span>
+        {% render 'stats', beach: beach, value_size: 'value--xsmall lg:value--small', label_size: 'label--small lg:label--base' %}
+        <span class="label label--small" data-clamp="1">{{ reminder }}</span>
+      </div>
+    </div>
+
+  {% when 'half_vertical' %}
+    <div class="layout layout--col layout--left gap--medium">
+      {% render 'details', beach: beach, reminder: reminder, size: size %}
+    </div>
+
+  {% when 'quadrant' %}
+    <div class="layout layout--col layout--left gap--small">
+      <div class="flex flex--row flex--wrap flex--center-y gap--small">
+        {% render 'flag', beach: beach, icon: 'h--[28px] lg:h--[40px]', text: 'label--large lg:label--xlarge' %}
+        <span class="label label--small label--outline lg:label--base">{{ beach.source_label }}</span>
+      </div>
+      <span class="title title--small lg:title--base" data-clamp="1">{{ beach.name }}</span>
+      <span class="description" data-clamp="2" data-clamp-lg="3">{{ beach.summary }}</span>
+      <span class="label label--small" data-clamp="1">Obey posted flags and lifeguards.</span>
+    </div>
+  {% endcase %}
+{% endif %}
+
+{% render 'title_bar', beach: beach, size: size, trmnl: trmnl %}
+
+<script type="text/javascript">
+  // Paint every flag partial's glyph, and repaint it on any mode, theme or
+  // device change. The marker stops a second pass (a mashup) from doubling up.
+  swimWhen(function () { return window.TRMNLPaint; }, function () {
+    document.querySelectorAll("img[data-flag-color]:not([data-flag-painted])").forEach(function (img) {
+      img.setAttribute("data-flag-painted", "true");
+      TRMNLPaint.watch(img, function () {
+        TRMNLPaint.apply(img, swimFlagPaint(img.getAttribute("data-flag-color"), img));
+      });
+    });
+  });
+</script>
+{% endtemplate %}
+
+{% template details %}
+{% comment %}
+The flag, name, summary, stats, alerts and reminder, as a left-aligned stack.
+The caller supplies the container: full's details column, half_vertical's layout.
+Parameters:
+- beach: the display-ready beach
+- reminder: the obey-posted-flags line
+- size: 'full' or 'half_vertical'
+{% endcomment %}
+{% if size == 'full' %}
+  {% assign icon = 'h--[44px] lg:h--[60px]' %}
+  {% assign title = 'title--large lg:title--xlarge' %}
+  {% assign clamp = 'data-clamp="3"' %}
+  {% assign value_size = 'value--small lg:value--base' %}
+{% else %}
+  {% assign icon = 'h--[40px] lg:h--[52px]' %}
+  {% assign title = 'lg:title--large' %}
+  {% assign clamp = 'data-clamp="4" data-clamp-lg="5"' %}
+  {% assign value_size = 'value--xsmall lg:value--small' %}
+{% endif %}
+<div class="flex flex--row flex--wrap flex--center-y gap--medium">
+  {% render 'flag', beach: beach, icon: icon, text: 'label--xlarge lg:label--xxlarge' %}
+  <span class="label label--outline lg:label--large">{{ beach.source_label }}</span>
+</div>
+<span class="title {{ title }}" data-clamp="2">{{ beach.name }}</span>
+<span class="description lg:description--large" {{ clamp }}>{{ beach.summary }}</span>
+{% render 'stats', beach: beach, value_size: value_size, label_size: 'label--small lg:label--base' %}
+{% render 'alerts', beach: beach, sizes: 'label--small lg:label--base' %}
+<span class="label label--small lg:label--base">{{ reminder }}</span>
+{% endtemplate %}
+
+{% template flag %}
+{% comment %}
+The flag: swim.report's flag glyph in the flag's color, then the color's name.
+image--adaptive turns the glyph into a mask (the runtime reads the data: URI, so
+no network), and main's painting pass paints it with swimFlagPaint: a dither on
+1-bit, a gray step on 2-/4-bit, the real ink on color panels that have it, and
+it follows themes. The black image-stroke sits on a wrapper because CSS applies
+filter before mask; it keeps a light yellow dither visible.
+Parameters:
+- beach: the display-ready beach
+- icon: height classes for the glyph
+- text: label size classes for the color name
+{% endcomment %}
+<div class="flex flex--row flex--center-y gap--small">
+  <span class="flex image-stroke image-stroke--small image-stroke--black">
+    <img class="image--adaptive w--auto {{ icon }}" src="{% render 'glyph', color: beach.color %}" data-flag-color="{{ beach.color }}" alt="">
+  </span>
+  <span class="label {{ text }}">{{ beach.label }}</span>
+</div>
+{% endtemplate %}
+
+{% template glyph %}
+{%- comment -%}
+The flag glyph as a data: URI: Font Awesome Free 7.3.1 solid flag
+(https://fontawesome.com/license/free), tight 448x512 box. double-red hangs a
+second banner on the same pole, 370 units down, as swim.report draws it.
+Parameters:
+- color: the flag color
+{%- endcomment -%}
+{%- if color == 'double-red' -%}
+data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 882'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3Cpath transform='translate%280 370%29' d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
+{%- else -%}
+data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
+{%- endif -%}
+{% endtemplate %}
+
+{% template stats %}
+{% comment %}
+Waves, rip current risk and distance, each shown only when known.
+Parameters:
+- beach: the display-ready beach
+- value_size, label_size: value and label size classes
+{% endcomment %}
+<div class="flex flex--row flex--wrap gap--large">
+  {% if beach.wave %}
+    <div class="flex flex--col flex--left gap--none">
+      <span class="value {{ value_size }} value--tnums">{{ beach.wave }}</span>
+      <span class="label {{ label_size }}">Waves</span>
+    </div>
+  {% endif %}
+  {% if beach.rip %}
+    <div class="flex flex--col flex--left gap--none">
+      <span class="value {{ value_size }}">{{ beach.rip | downcase | capitalize }}</span>
+      <span class="label {{ label_size }}">Rip risk</span>
+    </div>
+  {% endif %}
+  {% if beach.distance %}
+    <div class="flex flex--col flex--left gap--none">
+      <span class="value {{ value_size }} value--tnums">{{ beach.distance }}</span>
+      <span class="label {{ label_size }}">Away</span>
+    </div>
+  {% endif %}
+</div>
+{% endtemplate %}
+
+{% template alerts %}
+{% comment %}
+Weather alerts in effect at the beach.
+Parameters:
+- beach: the display-ready beach
+- sizes: label size classes
+{% endcomment %}
+{% if beach.alerts.size > 0 %}
+  <div class="flex flex--row flex--wrap gap--small">
+    {% for alert in beach.alerts %}
+      <span class="label label--underline {{ sizes }}">{{ alert }}</span>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endtemplate %}
+
+{% template title_bar %}
+{% comment %}
+Parameters:
+- beach: the display-ready beach, or nil
+- size: the layout size; full adds the date to the time
+- trmnl: the global trmnl object
+{% endcomment %}
+{% if trmnl.plugin_settings.custom_fields_values.timemode == '24_hour' %}
+  {% assign mask = '%H:%M' %}
+{% else %}
+  {% assign mask = '%-I:%M %p' %}
+{% endif %}
+{% if size == 'full' %}
+  {% assign mask = '%-m/%-d, ' | append: mask %}
+{% endif %}
+
+<div class="title_bar">
+  {% comment %} Font Awesome Free 7.3.1 solid flag, swim.report's own glyph. License: https://fontawesome.com/license/free {% endcomment %}
+  <svg class="image" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z"/></svg>
+  <span class="title">Swim Report</span>
+  {% comment %} date formats epoch seconds in UTC, so adding the user's offset yields their local time. {% endcomment %}
+  {% if beach.updated %}<span class="instance">{% if size == 'full' %}Updated {% endif %}{{ beach.updated | date: '%s' | plus: trmnl.user.utc_offset | date: mask }}</span>{% endif %}
+</div>
+{% endtemplate %}

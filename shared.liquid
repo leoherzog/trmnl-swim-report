@@ -70,8 +70,8 @@ Parameters:
           // beach first so it wins the declutter pass and draws on top.
           var flags = [[{{ beach.lon }}, {{ beach.lat }}, "{{ beach.color }}"]].concat({% if beach.nearby %}{{ beach.nearby | json }}{% else %}[]{% endif %});
           var glyphs = {
-            single: "{% render 'glyph', color: 'red' %}",
-            double: "{% render 'glyph', color: 'double-red' %}"
+            single: "data:image/svg+xml,{% render 'glyph', color: 'red' %}",
+            double: "data:image/svg+xml,{% render 'glyph', color: 'double-red' %}"
           };
           var mapEl = document.getElementById("swim-map");
 
@@ -206,15 +206,18 @@ image--adaptive turns the glyph into a mask (the runtime reads the data: URI, so
 no network), and main's painting pass paints it with swimFlagPaint: a dither on
 1-bit, a gray step on 2-/4-bit, the real ink on color panels that have it, and
 it follows themes. The black image-stroke sits on a wrapper because CSS applies
-filter before mask; it keeps a light yellow dither visible.
+filter before mask; it keeps a light yellow dither visible. Recipe validation
+GETs an <img> src that is not Liquid output, so the src is a literal data:
+prefix plus {{ }} output, never a bare render tag.
 Parameters:
 - beach: the display-ready beach
 - icon: height classes for the glyph
 - text: label size classes for the color name
 {% endcomment %}
+{%- capture glyph -%}{% render 'glyph', color: beach.color %}{%- endcapture -%}
 <div class="flex flex--row flex--center-y gap--small">
   <span class="flex image-stroke image-stroke--small image-stroke--black">
-    <img class="image--adaptive w--auto {{ icon }}" src="{% render 'glyph', color: beach.color %}" data-flag-color="{{ beach.color }}" alt="">
+    <img class="image--adaptive w--auto {{ icon }}" src="data:image/svg+xml,{{ glyph }}" data-flag-color="{{ beach.color }}" alt="">
   </span>
   <span class="label {{ text }}">{{ beach.label }}</span>
 </div>
@@ -222,16 +225,17 @@ Parameters:
 
 {% template glyph %}
 {%- comment -%}
-The flag glyph as a data: URI: Font Awesome Free 7.3.1 solid flag
+The flag glyph as URL-encoded SVG, the body of a data:image/svg+xml, URI
+(callers write the prefix): Font Awesome Free 7.3.1 solid flag
 (https://fontawesome.com/license/free), tight 448x512 box. double-red hangs a
 second banner on the same pole, 370 units down, as swim.report draws it.
 Parameters:
 - color: the flag color
 {%- endcomment -%}
 {%- if color == 'double-red' -%}
-data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 882'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3Cpath transform='translate%280 370%29' d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
+%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 882'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3Cpath transform='translate%280 370%29' d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
 {%- else -%}
-data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
+%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z'/%3E%3C/svg%3E
 {%- endif -%}
 {% endtemplate %}
 

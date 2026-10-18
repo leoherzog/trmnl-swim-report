@@ -38,7 +38,10 @@ All markup is in `shared.liquid`; the four size files only
 - The flag is an icon plus plain text, not a pill: the Font Awesome flag (tight
   448x512 viewBox; double-red stacks a second banner at +370) as a data-URI
   `<img class="image--adaptive" data-flag-color>`, which the runtime turns into a
-  mask, painted by `TRMNLPaint.apply(img, swimFlagPaint(color, el))`. `main` opens
+  mask, painted by `TRMNLPaint.apply(img, swimFlagPaint(color, el))`. The `glyph`
+  partial emits only the encoded SVG; the `src` is a literal `data:image/svg+xml,`
+  plus `{{ glyph }}`, because recipe validation GETs any `<img>` src that isn't
+  Liquid output. `main` opens
   with one script defining the helpers (`swimWhen`, the ready-wait; `swimFlagPaint`,
   flag color to paint) and ends with the pass that paints every flag glyph, so the
   `flag` partial has no script and the helpers exist before any caller. `swimFlagPaint`

@@ -58,7 +58,8 @@ Parameters:
     <div class="layout layout--row portrait:layout--col gap--medium lg:gap--large">
       {% if has_map %}
         <div id="swim-map" class="map stretch rounded--base"></div>
-        {% assign details_width = 'w--[42cqw] portrait:w--full' %}
+        {% comment %} In portrait the map takes every spare pixel, so the padding keeps the details off the title bar. {% endcomment %}
+        {% assign details_width = 'w--[42cqw] portrait:w--full portrait:pb--4 lg:portrait:pb--5' %}
       {% else %}
         {% assign details_width = 'w--full' %}
       {% endif %}
@@ -197,7 +198,11 @@ Parameters:
   {% assign icon = 'h--[48px] lg:h--[88px]' %}
   {% assign name = 'label label--xxlarge lg:value--base' %}
   {% assign title = 'title--large lg:title--xxlarge' %}
-  {% assign clamp = 'data-clamp="3" data-clamp-lg="4"' %}
+  {% if dense %}
+    {% assign clamp = 'data-clamp="2" data-clamp-lg="3"' %}
+  {% else %}
+    {% assign clamp = 'data-clamp="3" data-clamp-lg="4"' %}
+  {% endif %}
   {% assign value_size = 'value--small lg:value--large' %}
 {% else %}
   {% assign icon = 'h--[56px] lg:h--[128px]' %}

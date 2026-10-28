@@ -66,6 +66,8 @@ All markup is in `shared.liquid`; the four size files only
 - `full` adds a framework map (`.map` + `TRMNLMaps`, MapLibre 5.24.0 from trmnl.com,
   `streets` preset, zoom 13, `labels: true`; `'major'` showed nothing at zoom 13 and
   there is no `'minor'`) beside the details; `portrait:layout--col` stacks it.
+  In portrait the map takes every spare pixel, so the details column carries
+  `portrait:pb--4 lg:portrait:pb--5` to keep its last line off the title bar.
   Beaches are `maplibregl.Marker`s built from the same painted flag glyph (the
   `glyph` partial), with the pole's foot on the point (`anchor: bottom-left`). The
   selected beach is large; `beach.nearby` (transform: other beaches within 5 mi,
@@ -84,8 +86,8 @@ All markup is in `shared.liquid`; the four size files only
   slot. TRMNL's review checks OG landscape and X in both orientations for whitespace.
   `data-clamp-lg`, `-portrait` and `-lg-portrait` give the bigger slots more lines.
 - `main` sets `dense` when there are three stats or more than one alert. The stats
-  then drop one value size on the X, and the `details` stacks take tighter gaps, which
-  keeps worst-case data inside the slot.
+  then drop one value size on the X, the `details` stacks take tighter gaps, and
+  `full` clamps the summary a line shorter, which keeps worst-case data inside the slot.
 - Arbitrary pixel sizes such as `lg:h--[120px]` are precompiled only from 0 to 128px;
   a larger value is a class with no rule.
 - `half_horizontal` stacks the flag above the details in portrait. Its flag column

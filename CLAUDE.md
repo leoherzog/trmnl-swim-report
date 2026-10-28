@@ -15,6 +15,8 @@ hazard flag of the beach nearest a location, from the
   normalizes `lat lon` to `lat,lon`, or answers "Set a location"), then
   fetches `/api/beaches/{id}` for the nearest beach and outputs `{ beach, error }`.
   The list only carries `display`; reason, waves, rip risk and alerts need the detail.
+  Each alert line ends with its end time on the alert's own clock (`… until Fri 2 PM`,
+  24-hour when `timemode` is `24_hour`).
   A nearest beach farther than 50 mi (fixed, no setting; shown as 80 km in metric)
   becomes an error screen, since the API always names some beach, even an ocean away.
 - **Custom fields:** `custom_fields.yml` — `author_bio` ("About This Plugin", same shape as the sibling plugins), `location` (`field_type: lat_lon`: TRMNL's place search, stored as `lat,lon`), `units`
@@ -77,7 +79,19 @@ All markup is in `shared.liquid`; the four size files only
   `--framework-icon-src` and `data-adaptive` by hand. The map doesn't fetch
   `beaches.geojson` (1.5 MB, every beach); the polled near-list already has
   coordinates and colors.
-- Sizes scale with `lg:` for TRMNL X; base sizes target TRMNL OG.
+- Base sizes target TRMNL OG; `lg:` targets TRMNL X. The X is 1040x780 CSS px
+  with the OG's type scale, so each `lg:` steps two or three sizes up to fill the
+  slot. TRMNL's review checks OG landscape and X in both orientations for whitespace.
+  `data-clamp-lg`, `-portrait` and `-lg-portrait` give the bigger slots more lines.
+- `main` sets `dense` when there are three stats or more than one alert. The stats
+  then drop one value size on the X, and the `details` stacks take tighter gaps, which
+  keeps worst-case data inside the slot.
+- Arbitrary pixel sizes such as `lg:h--[120px]` are precompiled only from 0 to 128px;
+  a larger value is a class with no rule.
+- `half_horizontal` stacks the flag above the details in portrait. Its flag column
+  has no `flex--wrap`: a wrapping column that turns into a row stretches its line.
+- The `flag` partial's `text` is the name's full class list, so the X can use
+  `value` sizes past `label--xxlarge`.
 - The update time uses `date: '%s' | plus: trmnl.user.utc_offset | date: mask`.
 - Title bar icon: inline Font Awesome Free solid flag (swim.report's glyph).
 

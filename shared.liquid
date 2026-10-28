@@ -35,9 +35,9 @@ Parameters:
 </script>
 
 {% if beach == nil %}
-  <div class="layout layout--col">
-    <span class="title title--small lg:title--base text--center">Swim Report</span>
-    <span class="description lg:description--large text--center">{{ error | default: 'No data yet.' }}</span>
+  <div class="layout layout--col gap--small lg:gap--medium">
+    <span class="title lg:title--xlarge text--center">Swim Report</span>
+    <span class="description description--large lg:description--xxlarge text--center">{{ error | default: 'No data yet.' }}</span>
   </div>
 {% else %}
   {% if beach.source == 'official' %}
@@ -45,6 +45,12 @@ Parameters:
   {% else %}
     {% assign reminder = 'Not an official flag. Always obey posted flags and lifeguards.' %}
   {% endif %}
+  {% comment %} Three stats or several alerts overflow the X's largest stat sizes and gaps, so they take tighter ones. {% endcomment %}
+  {% assign stat_count = 0 %}
+  {% if beach.wave %}{% assign stat_count = stat_count | plus: 1 %}{% endif %}
+  {% if beach.rip %}{% assign stat_count = stat_count | plus: 1 %}{% endif %}
+  {% if beach.distance %}{% assign stat_count = stat_count | plus: 1 %}{% endif %}
+  {% if stat_count > 2 or beach.alerts.size > 1 %}{% assign dense = true %}{% else %}{% assign dense = false %}{% endif %}
 
   {% case size %}
   {% when 'full' %}
@@ -56,8 +62,8 @@ Parameters:
       {% else %}
         {% assign details_width = 'w--full' %}
       {% endif %}
-      <div class="flex flex--col flex--left gap--medium {{ details_width }}">
-        {% render 'details', beach: beach, reminder: reminder, size: size %}
+      <div class="flex flex--col flex--left {% if dense %}gap lg:gap--medium{% else %}gap--medium lg:gap--large{% endif %} {{ details_width }}">
+        {% render 'details', beach: beach, reminder: reminder, size: size, dense: dense %}
       </div>
     </div>
 
@@ -121,33 +127,42 @@ Parameters:
     {% endif %}
 
   {% when 'half_horizontal' %}
-    <div class="layout layout--row layout--left gap--large">
-      <div class="flex flex--col flex--left gap--small">
-        {% render 'flag', beach: beach, icon: 'h--[40px] lg:h--[52px]', text: 'label--xlarge lg:label--xxlarge' %}
-        <span class="label label--small label--outline lg:label--base">{{ beach.source_label }}</span>
+    {% comment %} The flag beside the details, or above them in portrait. {% endcomment %}
+    <div class="layout layout--row portrait:layout--col layout--left gap--large">
+      <div class="flex flex--col portrait:flex--row flex--left portrait:flex--center-y gap--small lg:gap--medium">
+        {% render 'flag', beach: beach, icon: 'h--[64px] lg:h--[120px]', text: 'label label--xxlarge lg:value--base' %}
+        <span class="label label--outline lg:label--large">{{ beach.source_label }}</span>
       </div>
-      <div class="flex flex--col flex--left gap--small grow">
-        <span class="title lg:title--large" data-clamp="1">{{ beach.name }}</span>
-        <span class="description lg:description--large" data-clamp="2">{{ beach.summary }}</span>
-        {% render 'stats', beach: beach, value_size: 'value--xsmall lg:value--small', label_size: 'label--small lg:label--base' %}
-        <span class="label label--small" data-clamp="1">{{ reminder }}</span>
+      <div class="flex flex--col flex--left gap--small lg:gap--large lg:portrait:gap--medium grow portrait:grow-0 portrait:w--full">
+        <span class="title title--large lg:title--xxlarge" data-clamp="1" data-clamp-portrait="2">{{ beach.name }}</span>
+        <span class="description description--large lg:description--xxlarge" data-clamp="2" data-clamp-portrait="3">{{ beach.summary }}</span>
+        {% if dense %}
+          {% assign value_size = 'value--small lg:value--large' %}
+        {% else %}
+          {% assign value_size = 'value--small lg:value--xlarge lg:portrait:value--large' %}
+        {% endif %}
+        {% render 'stats', beach: beach, value_size: value_size, label_size: 'lg:label--large' %}
+        <span class="label lg:label--large" data-clamp="1" data-clamp-lg="2">{{ reminder }}</span>
       </div>
     </div>
 
   {% when 'half_vertical' %}
-    <div class="layout layout--col layout--left gap--medium">
-      {% render 'details', beach: beach, reminder: reminder, size: size %}
+    <div class="layout layout--col layout--left {% if dense %}gap lg:gap--large{% else %}gap--medium lg:gap--xlarge{% endif %}">
+      {% render 'details', beach: beach, reminder: reminder, size: size, dense: dense %}
     </div>
 
   {% when 'quadrant' %}
-    <div class="layout layout--col layout--left gap--small">
-      <div class="flex flex--row flex--wrap flex--center-y gap--small">
-        {% render 'flag', beach: beach, icon: 'h--[28px] lg:h--[40px]', text: 'label--large lg:label--xlarge' %}
-        <span class="label label--small label--outline lg:label--base">{{ beach.source_label }}</span>
+    <div class="layout layout--col layout--left gap--small lg:gap--medium">
+      <div class="flex flex--row flex--left flex--wrap flex--center-y gap--small">
+        {% render 'flag', beach: beach, icon: 'h--[40px] lg:h--[72px]', text: 'label label--xlarge lg:value--base' %}
+        <span class="label label--small label--outline lg:label--large">{{ beach.source_label }}</span>
       </div>
-      <span class="title title--small lg:title--base" data-clamp="1">{{ beach.name }}</span>
-      <span class="description" data-clamp="2" data-clamp-lg="3">{{ beach.summary }}</span>
-      <span class="label label--small" data-clamp="1">Obey posted flags and lifeguards.</span>
+      <span class="title title--large lg:title--xlarge" data-clamp="1" data-clamp-portrait="2">{{ beach.name }}</span>
+      <span class="description description--large lg:description--xxlarge" data-clamp="2" data-clamp-portrait="3">{{ beach.summary }}</span>
+      <div class="hidden lg:block">
+        {% render 'stats', beach: beach, value_size: 'value--base', label_size: 'label--large' %}
+      </div>
+      <span class="label lg:label--large" data-clamp="1" data-clamp-lg="2" data-clamp-portrait="2">Obey posted flags and lifeguards.</span>
     </div>
   {% endcase %}
 {% endif %}
@@ -176,27 +191,34 @@ Parameters:
 - beach: the display-ready beach
 - reminder: the obey-posted-flags line
 - size: 'full' or 'half_vertical'
+- dense: true when the stats or alerts need the tighter sizes
 {% endcomment %}
 {% if size == 'full' %}
-  {% assign icon = 'h--[44px] lg:h--[60px]' %}
-  {% assign title = 'title--large lg:title--xlarge' %}
-  {% assign clamp = 'data-clamp="3"' %}
-  {% assign value_size = 'value--small lg:value--base' %}
+  {% assign icon = 'h--[48px] lg:h--[88px]' %}
+  {% assign name = 'label label--xxlarge lg:value--base' %}
+  {% assign title = 'title--large lg:title--xxlarge' %}
+  {% assign clamp = 'data-clamp="3" data-clamp-lg="4"' %}
+  {% assign value_size = 'value--small lg:value--large' %}
 {% else %}
-  {% assign icon = 'h--[40px] lg:h--[52px]' %}
-  {% assign title = 'lg:title--large' %}
-  {% assign clamp = 'data-clamp="4" data-clamp-lg="5"' %}
-  {% assign value_size = 'value--xsmall lg:value--small' %}
+  {% assign icon = 'h--[56px] lg:h--[128px]' %}
+  {% assign name = 'label label--xxlarge lg:value--large' %}
+  {% assign title = 'title--large lg:title--xxlarge' %}
+  {% assign clamp = 'data-clamp="3" data-clamp-lg="5" data-clamp-lg-portrait="4"' %}
+  {% comment %} Two stats at value--xlarge stack in the narrow X portrait column; in landscape a wide pair would wrap. {% endcomment %}
+  {% assign value_size = 'value--small lg:value--large lg:portrait:value--xlarge' %}
 {% endif %}
-<div class="flex flex--row flex--wrap flex--center-y gap--medium">
-  {% render 'flag', beach: beach, icon: icon, text: 'label--xlarge lg:label--xxlarge' %}
+{% if dense %}
+  {% assign value_size = 'value--small lg:value--base' %}
+{% endif %}
+<div class="flex flex--row flex--left flex--wrap flex--center-y gap--medium">
+  {% render 'flag', beach: beach, icon: icon, text: name %}
   <span class="label label--outline lg:label--large">{{ beach.source_label }}</span>
 </div>
 <span class="title {{ title }}" data-clamp="2">{{ beach.name }}</span>
-<span class="description lg:description--large" {{ clamp }}>{{ beach.summary }}</span>
-{% render 'stats', beach: beach, value_size: value_size, label_size: 'label--small lg:label--base' %}
-{% render 'alerts', beach: beach, sizes: 'label--small lg:label--base' %}
-<span class="label label--small lg:label--base">{{ reminder }}</span>
+<span class="description description--large lg:description--xxlarge" {{ clamp }}>{{ beach.summary }}</span>
+{% render 'stats', beach: beach, value_size: value_size, label_size: 'lg:label--large' %}
+{% render 'alerts', beach: beach, sizes: 'lg:label--large' %}
+<span class="label lg:label--large">{{ reminder }}</span>
 {% endtemplate %}
 
 {% template flag %}
@@ -212,14 +234,14 @@ prefix plus {{ }} output, never a bare render tag.
 Parameters:
 - beach: the display-ready beach
 - icon: height classes for the glyph
-- text: label size classes for the color name
+- text: classes for the color name, label or value
 {% endcomment %}
 {%- capture glyph -%}{% render 'glyph', color: beach.color %}{%- endcapture -%}
-<div class="flex flex--row flex--center-y gap--small">
+<div class="flex flex--row flex--left flex--wrap flex--center-y gap--small">
   <span class="flex image-stroke image-stroke--small image-stroke--black">
     <img class="image--adaptive w--auto {{ icon }}" src="data:image/svg+xml,{{ glyph }}" data-flag-color="{{ beach.color }}" alt="">
   </span>
-  <span class="label {{ text }}">{{ beach.label }}</span>
+  <span class="{{ text }}">{{ beach.label }}</span>
 </div>
 {% endtemplate %}
 
@@ -246,7 +268,7 @@ Parameters:
 - beach: the display-ready beach
 - value_size, label_size: value and label size classes
 {% endcomment %}
-<div class="flex flex--row flex--wrap gap--large">
+<div class="flex flex--row flex--left flex--wrap gap--large">
   {% if beach.wave %}
     <div class="flex flex--col flex--left gap--none">
       <span class="value {{ value_size }} value--tnums">{{ beach.wave }}</span>

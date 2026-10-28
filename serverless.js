@@ -3,7 +3,7 @@
 // Input (from TRMNL):
 //   The polled https://swim.report/api/beaches?near={{ location }} list, at the
 //   root.
-//   trmnl.plugin_settings.custom_fields_values: { location, units }
+//   trmnl.plugin_settings.custom_fields_values: { location, units, timemode }
 // The list only carries each beach's display flag, so the nearest beach's full
 // record (reason, waves, rip risk, alerts) is fetched here from
 // /api/beaches/{id}. If the poll failed (a blank location, or one typed as
@@ -67,13 +67,32 @@ function formatDistance(mi, metric) {
   return metric ? `${(mi * 1.609344).toFixed(1)} km` : `${mi.toFixed(1)} mi`;
 }
 
-// The estimate's alert events, deduped, in feed order.
-function alertEvents(estimate) {
-  const events = [];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const NBSP = String.fromCharCode(160);
+
+// An ISO time as the wall clock of its own offset, which NWS sets to the
+// alert's zone: "2026-10-30T14:00:00-07:00" -> "Fri 2 PM". Null when absent.
+function formatEnds(iso, h24) {
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(iso || '');
+  if (!m) return null;
+  const day = DAYS[new Date(Date.UTC(+m[1], m[2] - 1, +m[3])).getUTCDay()];
+  if (h24) return `${day} ${m[4]}:${m[5]}`;
+  const hour = Number(m[4]);
+  return `${day} ${hour % 12 || 12}${m[5] === '00' ? '' : `:${m[5]}`} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+// The estimate's alerts, one per event in feed order, with their end time.
+// The end time's spaces don't break, so a long line wraps before "until".
+function alertLines(estimate, h24) {
+  const seen = new Set();
+  const lines = [];
   for (const detail of (estimate && estimate.alertDetails) || []) {
-    if (detail && detail.event && !events.includes(detail.event)) events.push(detail.event);
+    if (!detail || !detail.event || seen.has(detail.event)) continue;
+    seen.add(detail.event);
+    const ends = formatEnds(detail.ends, h24);
+    lines.push(ends ? `${detail.event} ${`until ${ends}`.replace(/ /g, NBSP)}` : detail.event);
   }
-  return events;
+  return lines;
 }
 
 // The other beaches close enough to land on the full layout's map, as small
@@ -140,7 +159,7 @@ async function run(input) {
         summary: summarize(display, estimate),
         wave: formatWave(estimate && estimate.waveHeightFt, metric),
         rip: (estimate && estimate.ripCurrentRisk) || null,
-        alerts: alertEvents(estimate).slice(0, 3),
+        alerts: alertLines(estimate, fields.timemode === '24_hour').slice(0, 3),
         distance: formatDistance(nearest.distanceMi, metric),
         updated: updated || list.builtAt || null,
         nearby: nearbyFlags(list.beaches.slice(1)),
